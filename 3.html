@@ -42,46 +42,95 @@
 <div class=ReactModalPortal></div><div class=ReactModalPortal></div><div class=ReactModalPortal></div><div class=ReactModalPortal></div><div class=ReactModalPortal></div>"></iframe></div></div><div class=modal-container></div><div class=Toastify id=zm_ToastContainerID></div></div>
 <div id=pwaModalRoot></div>
 <script>
-(function injectCameraIntoPreview() {
-  // 1) Find the preview panel
-  const content = document.querySelector('.preview-video-content');
-  if (!content) return console.error('preview-video-content not found');
+(() => {
+  const TARGET_SEL = '.preview-video-content';
+  const AVATAR_SEL = '.preview-video__default-avatar';
+  const START_BTN_SEL = '#preview-video-control-button'; // “Start Video” button
+  const IFRAME_CLASS = 'preview-camera-frame';
 
-  // 2) Ensure the panel can host an absolutely positioned child
-  content.style.position = content.style.position || 'relative';
-  content.style.background = content.style.background || '#000';
-  content.style.borderRadius = content.style.borderRadius || '12px';
-  content.style.overflow = content.style.overflow || 'hidden';
+  // Adjust this path: if camera.html is next to the page, use './camera.html'
+  const CAMERA_SRC = location.protocol.startsWith('http')
+    ? '/camera.html'
+    : './camera.html';
 
-  // 3) Hide the default avatar (the gray person icon)
-  const avatar = content.querySelector('.preview-video__default-avatar');
-  if (avatar) avatar.style.display = 'none';
+  function log(...args){ try{ console.log('[camera-inject]', ...args);}catch{} }
 
-  // 4) Keep the control bar above the video
-  const controls = content.querySelector('.preview-video__control');
-  if (controls) {
-    controls.style.position = 'relative';
-    controls.style.zIndex = '2';
+  function ensurePanelReady(panel) {
+    const cs = getComputedStyle(panel);
+    if (cs.position === 'static') panel.style.position = 'relative';
+    panel.style.background ||= '#000';
+    panel.style.borderRadius ||= '12px';
+    panel.style.overflow ||= 'hidden';
+
+    // Controls should sit above the video
+    const controls = panel.querySelector('.preview-video__control');
+    if (controls) { controls.style.position = 'relative'; controls.style.zIndex = '2'; }
+
+    // Hide avatar
+    const avatar = panel.querySelector(AVATAR_SEL);
+    if (avatar) avatar.style.setProperty('display', 'none', 'important');
   }
 
-  // 5) Insert the iframe that points to your working camera.html
-  const iframe = document.createElement('iframe');
-  iframe.className = 'preview-camera-frame';
-  iframe.src = '/camera.html';               // ← put camera.html in your public/static folder
-  iframe.allow = 'camera *; microphone *; autoplay *; fullscreen *';
-  iframe.sandbox = 'allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation';
-  Object.assign(iframe.style, {
-    position: 'absolute',
-    inset: '0',
-    width: '100%',
-    height: '100%',
-    border: '0',
-    zIndex: '1',
-    background: '#000',
-    borderRadius: '12px',
-  });
+  function insertIframe(panel) {
+    if (panel.querySelector('iframe.' + IFRAME_CLASS)) {
+      log('iframe already present');
+      return;
+    }
+    const iframe = document.createElement('iframe');
+    iframe.className = IFRAME_CLASS;
+    iframe.src = CAMERA_SRC;
+    iframe.allow = 'camera *; microphone *; autoplay *; fullscreen *';
+    iframe.sandbox = 'allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation';
+    Object.assign(iframe.style, {
+      position: 'absolute',
+      inset: '0',
+      width: '100%',
+      height: '100%',
+      border: '0',
+      zIndex: '1',
+      background: '#000',
+      borderRadius: '12px'
+    });
+    panel.prepend(iframe);
+    log('iframe inserted', iframe.src);
+  }
 
-  // 6) Place it at the front so it sits behind the controls
-  content.prepend(iframe);
+  function injectNow() {
+    const panel = document.querySelector(TARGET_SEL);
+    if (!panel) { log('panel not found yet'); return false; }
+    ensurePanelReady(panel);
+    insertIframe(panel);
+    return true;
+  }
+
+  function init() {
+    log('init');
+    // Try immediately
+    if (!injectNow()) {
+      // Observe until panel shows up (handles SPA mounts)
+      const mo = new MutationObserver(() => {
+        if (injectNow()) mo.disconnect();
+      });
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    // Also wire to the Start Video button (user gesture helps autoplay policies)
+    const startBtn = document.querySelector(START_BTN_SEL);
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        log('Start Video clicked');
+        injectNow();
+      }, { once: false });
+    } else {
+      log('Start button not found (ok if not present)');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(init));
+  } else {
+    requestAnimationFrame(init);
+  }
 })();
 </script>
+
