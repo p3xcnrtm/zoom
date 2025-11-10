@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Camera</title>
+  <style>
+    html,body{height:100%;margin:0;background:#000}
+    .wrap{height:100%;display:grid;place-items:center}
+    video{width:100%;max-width:520px;border-radius:12px;background:#000}
+    #err{position:fixed;left:12px;right:12px;bottom:12px;color:#fff;font:14px system-ui}
+    #start{position:fixed;top:12px;right:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap"><video id="v" autoplay playsinline muted></video></div>
+  <button id="start" hidden>Start camera</button>
+  <div id="err"></div>
+  <script>
+    const v = document.getElementById('v');
+    const err = document.getElementById('err');
+    const start = document.getElementById('start');
+
+    function show(e){ err.textContent = e?.message || String(e || ''); }
+
+    async function go(){
+      try{
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        v.srcObject = s; await v.play().catch(()=>{});
+        start.hidden = true; err.textContent = '';
+      }catch(e){
+        start.hidden = false; show(e);
+      }
+    }
+
+    if(!navigator.mediaDevices?.getUserMedia){ show('Camera API not available'); }
+    else { go(); }
+    start.addEventListener('click', go);
+  </script>
+</body>
+</html>
